@@ -1,0 +1,274 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.hhxy.huazi</groupId>
+    <artifactId>netagent</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <name>netagent</name>
+    <description>智能体项目底座</description>
+
+    <modules>
+        <module>netagent-starter</module>
+        <module>netagent-agent</module>
+        <module>netagent-knowledge</module>
+        <module>netagent-mcp</module>
+        <module>netagent-memory</module>
+    </modules>
+
+    <properties>
+        <java.version>17</java.version>
+        <maven.compiler.source>${java.version}</maven.compiler.source>
+        <maven.compiler.target>${java.version}</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <spring-boot.version>3.5.7</spring-boot.version>
+        <postgresql.version>42.7.8</postgresql.version>
+        <lombok.version>1.18.42</lombok.version>
+        <milvus-sdk.version>2.6.6</milvus-sdk.version>
+        <tika.version>3.2.3</tika.version>
+        <hutool-all.version>5.8.37</hutool-all.version>
+        <mybatis-plus-spring-boot3-starter.version>3.5.14</mybatis-plus-spring-boot3-starter.version>
+        <s3.version>2.40.2</s3.version>
+        <mockito-core.version>5.20.0</mockito-core.version>
+        <sa-token.version>1.43.0</sa-token.version>
+        <transmittable-thread-local.version>2.14.5</transmittable-thread-local.version>
+        <redisson.version>4.0.0</redisson.version>
+        <rocketmq-spring-boot-starter.version>2.3.5</rocketmq-spring-boot-starter.version>
+        <okhttp.version>4.12.0</okhttp.version>
+        <mcp-sdk.version>1.1.2</mcp-sdk.version>
+        <spotless-maven-plugin.version>2.22.1</spotless-maven-plugin.version>
+    </properties>
+    <!-- 这里只统一锁定依赖版本，不会自动引入依赖；子模块需在 dependencies 中按需声明 -->
+    <dependencyManagement>
+        <dependencies>
+            <!-- Spring Boot 依赖版本清单（BOM）：统一管理 Spring 及常用第三方库的兼容版本 -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <!-- Tika 版本清单（BOM）：统一文档解析组件版本；实际解析 PDF、Word 等文件还需引入对应组件 -->
+            <dependency>
+                <groupId>org.apache.tika</groupId>
+                <artifactId>tika-bom</artifactId>
+                <version>${tika.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- 基础服务依赖：统一管理版本，子模块按需引入 -->
+            <!-- Web 开发：提供 Spring MVC、内嵌 Tomcat 和 Jackson JSON 支持，用于编写 HTTP 接口 -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-web</artifactId>
+                <version>${spring-boot.version}</version>
+            </dependency>
+
+            <!-- JDBC 数据访问：提供 Spring JDBC 和 HikariCP 连接池，具体数据库驱动需单独引入 -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-jdbc</artifactId>
+                <version>${spring-boot.version}</version>
+            </dependency>
+
+            <!-- 参数校验：支持 @NotNull、@NotBlank、@Size 等注解，用于校验接口入参和实体字段 -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-validation</artifactId>
+                <version>${spring-boot.version}</version>
+            </dependency>
+
+            <!-- 测试工具集：提供 JUnit Jupiter、Mockito 和 Spring Test 等，仅在测试阶段使用 -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-test</artifactId>
+                <version>${spring-boot.version}</version>
+                <scope>test</scope>
+            </dependency>
+
+            <!-- PostgreSQL 数据库驱动：让 Java 应用通过 JDBC 连接 PostgreSQL 并执行 SQL -->
+            <dependency>
+                <groupId>org.postgresql</groupId>
+                <artifactId>postgresql</artifactId>
+                <version>${postgresql.version}</version>
+            </dependency>
+
+            <!-- Lombok：编译时通过注解生成 getter、setter、构造方法和日志字段等，减少样板代码 -->
+            <dependency>
+                <groupId>org.projectlombok</groupId>
+                <artifactId>lombok</artifactId>
+                <version>${lombok.version}</version>
+            </dependency>
+
+            <!-- Milvus 向量数据库客户端：写入、查询向量并进行相似度检索，可用于知识库召回；不负责生成向量 -->
+            <dependency>
+                <groupId>io.milvus</groupId>
+                <artifactId>milvus-sdk-java</artifactId>
+                <version>${milvus-sdk.version}</version>
+            </dependency>
+
+            <!-- Hutool 工具库：提供字符串、日期、集合、文件等常用操作的工具类 -->
+            <dependency>
+                <groupId>cn.hutool</groupId>
+                <artifactId>hutool-all</artifactId>
+                <version>${hutool-all.version}</version>
+            </dependency>
+
+            <!-- MyBatis-Plus 的 Spring Boot 3 集成：提供通用 CRUD、条件构造器和持久层自动配置 -->
+            <dependency>
+                <groupId>com.baomidou</groupId>
+                <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+                <version>${mybatis-plus-spring-boot3-starter.version}</version>
+            </dependency>
+
+            <!-- MyBatis-Plus SQL 解析支持：供分页、多租户、数据权限等插件解析和改写 SQL，不是数据库驱动 -->
+            <dependency>
+                <groupId>com.baomidou</groupId>
+                <artifactId>mybatis-plus-jsqlparser</artifactId>
+                <version>${mybatis-plus-spring-boot3-starter.version}</version>
+            </dependency>
+
+            <!-- S3 对象存储客户端：上传、下载和管理文件，可对接 Amazon S3 或兼容 S3 协议的存储服务 -->
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>s3</artifactId>
+                <version>${s3.version}</version>
+            </dependency>
+
+            <!-- Mockito 核心库：测试中模拟依赖对象、设置返回值并验证调用；此处单独锁定其版本 -->
+            <dependency>
+                <groupId>org.mockito</groupId>
+                <artifactId>mockito-core</artifactId>
+                <version>${mockito-core.version}</version>
+                <scope>test</scope>
+            </dependency>
+
+            <!-- Sa-Token 的 Spring Boot 3 集成：提供登录会话、Token 管理、角色与权限校验能力 -->
+            <dependency>
+                <groupId>cn.dev33</groupId>
+                <artifactId>sa-token-spring-boot3-starter</artifactId>
+                <version>${sa-token.version}</version>
+            </dependency>
+
+            <!-- Sa-Token Redis 存储适配：通过 RedisTemplate 保存认证会话等数据，支持多实例共享登录状态 -->
+            <dependency>
+                <groupId>cn.dev33</groupId>
+                <artifactId>sa-token-redis-template</artifactId>
+                <version>${sa-token.version}</version>
+            </dependency>
+
+            <!-- TTL 线程上下文传递：配合任务或线程池包装，在线程池异步执行时传递用户标识、链路标识等上下文 -->
+            <dependency>
+                <groupId>com.alibaba</groupId>
+                <artifactId>transmittable-thread-local</artifactId>
+                <version>${transmittable-thread-local.version}</version>
+            </dependency>
+
+            <!-- Redisson 的 Spring Boot 集成：提供 Redis 客户端、分布式锁、分布式集合等能力 -->
+            <dependency>
+                <groupId>org.redisson</groupId>
+                <artifactId>redisson-spring-boot-starter</artifactId>
+                <version>${redisson.version}</version>
+            </dependency>
+
+            <!-- RocketMQ 消息队列集成：用于消息发送与消费，支持异步任务处理和服务解耦 -->
+            <dependency>
+                <groupId>org.apache.rocketmq</groupId>
+                <artifactId>rocketmq-spring-boot-starter</artifactId>
+                <version>${rocketmq-spring-boot-starter.version}</version>
+            </dependency>
+
+            <!-- OkHttp HTTP 客户端：向外部服务发送 HTTP 请求，例如调用大模型或第三方接口 -->
+            <dependency>
+                <groupId>com.squareup.okhttp3</groupId>
+                <artifactId>okhttp</artifactId>
+                <version>${okhttp.version}</version>
+            </dependency>
+
+            <!-- MCP Java SDK：构建 MCP 客户端或服务端，通过标准协议对接工具、资源和提示词 -->
+            <dependency>
+                <groupId>io.modelcontextprotocol.sdk</groupId>
+                <artifactId>mcp</artifactId>
+                <version>${mcp-sdk.version}</version>
+            </dependency>
+
+            <!-- MCP 的 Jackson 2 适配包：使用 Jackson 2 对 MCP 协议消息进行 JSON 序列化与反序列化 -->
+            <dependency>
+                <groupId>io.modelcontextprotocol.sdk</groupId>
+                <artifactId>mcp-json-jackson2</artifactId>
+                <version>${mcp-sdk.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.hhxy.huazi</groupId>
+                <artifactId>netagent-agent</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.hhxy.huazi</groupId>
+                <artifactId>netagent-knowledge</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.hhxy.huazi</groupId>
+                <artifactId>netagent-mcp</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.hhxy.huazi</groupId>
+                <artifactId>netagent-memory</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>3.13.0</version>
+                    <configuration>
+                        <source>${java.version}</source>
+                        <target>${java.version}</target>
+                        <parameters>true</parameters>
+                        <annotationProcessorPaths>
+                            <path>
+                                <groupId>org.projectlombok</groupId>
+                                <artifactId>lombok</artifactId>
+                                <version>${lombok.version}</version>
+                            </path>
+                        </annotationProcessorPaths>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                    <version>${spring-boot.version}</version>
+                    <executions>
+                        <execution>
+                            <goals>
+                                <goal>repackage</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                    <configuration>
+                        <excludes>
+                            <exclude>
+                                <groupId>org.projectlombok</groupId>
+                                <artifactId>lombok</artifactId>
+                            </exclude>
+                        </excludes>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+
+</project>
