@@ -1,11 +1,14 @@
 -- 操作名、参数顺序和返回状态必须与 Java 存储层保持一致，避免协议解析错位。
 local op = ARGV[1]
+-- expected 是预读版本，revision 是候选新版本；空 expected 只用于不要求已有版本的操作。
 local expected = ARGV[2]
 local revision = ARGV[3]
+-- payload 只保存轮次列表，版本和提交元数据以独立 Hash 字段保存。
 local payload = ARGV[4]
 local updated = ARGV[5]
 local commitId = ARGV[6]
 local digest = ARGV[7]
+-- 保留时长以毫秒传入；所有容量限制由服务端配置传入，不依赖请求端自行遵守。
 local ttl = tonumber(ARGV[8])
 local maxBytes = tonumber(ARGV[9])
 local maxTurns = tonumber(ARGV[10])
@@ -16,6 +19,7 @@ local function nonempty(value)
     return type(value) == 'string' and #value > 0
 end
 
+-- 版本只接受小写十六进制及固定分隔符布局；此处只校验，不生成或递增版本。
 local function uuid(value)
     return type(value) == 'string' and #value == 36
         and value:match('^[0-9a-f%-]+$') ~= nil
@@ -23,6 +27,7 @@ local function uuid(value)
         and value:sub(19, 19) == '-' and value:sub(24, 24) == '-'
 end
 
+-- Lua 表必须是从 1 开始的连续整数索引，不能把映射对象或稀疏列表当成消息数组。
 local function array(value)
     if type(value) ~= 'table' then return false end
     local count = 0
@@ -33,6 +38,7 @@ local function array(value)
     return count == #value
 end
 
+-- 只接受 UTC 的 Z 后缀和至多纳秒精度，并核对实际日历日期，避免写入 Java 无法解析的时间。
 local function timestamp(value)
     if type(value) ~= 'string' then return false end
     local year, month, day, hour, minute, second, fraction =
@@ -47,6 +53,7 @@ local function timestamp(value)
     return day >= 1 and day <= days[month]
 end
 
+-- 固定字段集合既不能缺项也不能多项，避免将未知格式误判为当前版本。
 local function fields(value, names)
     if type(value) ~= 'table' then return false end
     local count = 0
@@ -59,6 +66,7 @@ local function fields(value, names)
     return count == required
 end
 
+-- 存储入口再次核对完整轮次结构，不能只信任 Java 调用方已经做过校验。
 local function validTurn(turn)
     if not fields(turn, {requestId=true, createdAt=true, messages=true})
         or not nonempty(turn.requestId) or not timestamp(turn.createdAt)
@@ -122,10 +130,12 @@ local function boundedTurns(raw)
     return true
 end
 
+-- 与 Java 默认不转义斜杠的输出对齐，否则信封字节数可能因转义形式不同而偏大。
 local function quote(value)
     return cjson.encode(value):gsub('\\/', '/')
 end
 
+-- 成功返回解码后的轮次表，失败返回 nil；空轮次表在 Lua 中仍为真值。
 local function validState(schema, rev, raw, time, id, hash)
     if schema ~= '1' or not uuid(rev) or type(raw) ~= 'string' or #raw > maxBytes
         or not raw:match('^%s*%[') or not timestamp(time)
@@ -155,6 +165,7 @@ local function validState(schema, rev, raw, time, id, hash)
     return turns
 end
 
+-- 按解码后的结构双向比较，防止只比较公共字段而漏掉额外字段或数组元素。
 local function same(left, right)
     if type(left) ~= type(right) then return false end
     if type(left) ~= 'table' then return left == right end
@@ -167,6 +178,7 @@ local function same(left, right)
     return true
 end
 
+-- 所有参数校验均先于写命令，避免参数无效时已写入部分状态。
 if #KEYS ~= 1 or #ARGV ~= 12 or not ttl or ttl <= 0 or ttl % 1 ~= 0 or ttl > 9007199254740991
     or not maxBytes or maxBytes <= 0 or not maxTurns or maxTurns < 1
     or not maxMessages or maxMessages < 2 or not maxTurnBytes or maxTurnBytes < 1 then
@@ -174,6 +186,7 @@ if #KEYS ~= 1 or #ARGV ~= 12 or not ttl or ttl <= 0 or ttl % 1 ~= 0 or ttl > 900
 end
 if op ~= 'load' and op ~= 'init' and op ~= 'cas' and op ~= 'clear' then return {'INVALID'} end
 local replacement
+-- 读取不需要替换快照；初始化与清空必须提供空窗口，普通提交必须提供非空窗口和不同的新版本。
 if op ~= 'load' then
     replacement = validState('1', revision, payload, updated, commitId, digest)
     if not replacement then return {'INVALID'} end
@@ -195,8 +208,10 @@ if exists then
     current = redis.call('HMGET', KEYS[1], 'schemaVersion', 'revision', 'payload', 'updatedAt',
         'lastCommitId', 'lastCommitDigest')
     turns = validState(current[1], current[2], current[3], current[4], current[5], current[6])
+    -- 已存在的记忆必须带保留期，不能把永不过期的异常键默认为正常会话。
     if not turns or redis.call('PTTL', KEYS[1]) < 0 then return {'FORMAT'} end
 end
+-- 扁平数组的字段位置是 Java 解码协议的一部分，initialized 只标记本次是否实际创建。
 local function state(initialized)
     return {'STATE', initialized, current[1], current[2], current[3], current[4], current[5], current[6]}
 end

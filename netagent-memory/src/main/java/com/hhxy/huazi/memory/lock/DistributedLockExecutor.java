@@ -25,13 +25,17 @@ public final class DistributedLockExecutor {
         this.meters = Objects.requireNonNull(meters, "指标注册表不能为空");
     }
 
+    /** 在获锁线程同步执行业务，业务异常原样传播，不转换成锁不可用。 */
     @FunctionalInterface
     public interface Work<T> {
+        /** 可返回空值；退出方法即开始释放锁，不可用未完成的异步结果延长临界区。 */
         T execute() throws Exception;
     }
 
+    // NOT_ACQUIRED 表示未获锁；RELEASED 表示已释放；LOST 表示解锁时已无所有权；FAILED 表示解锁失败、无法确认释放。
     public enum ReleaseStatus { NOT_ACQUIRED, RELEASED, LOST, FAILED }
 
+    // acquired 表示曾经获锁，不表示返回时仍持有锁；业务抛出异常时不会生成 Execution。
     /** 获锁后的空结果有效；释放失败通过状态报告，不丢弃已完成的结果。 */
     public record Execution<T>(boolean acquired, T value, ReleaseStatus releaseStatus) {
         public Execution {
@@ -41,12 +45,14 @@ public final class DistributedLockExecutor {
             }
         }
 
+        /** 仅打印执行状态，不将业务返回值带入日志。 */
         @Override
         public String toString() {
             return "Execution[acquired=" + acquired + ", releaseStatus=" + releaseStatus + "]";
         }
     }
 
+    /** wait 仅用于锁竞争等待，不是业务超时；acquired 为 false 时不执行回调，中断原样抛出且保留线程中断标记。 */
     public <T> Execution<T> tryExecute(String lockName, Duration wait, Work<T> work) throws Exception {
         if (lockName == null || lockName.isBlank()) {
             throw new IllegalArgumentException("锁名不能为空");
@@ -68,6 +74,7 @@ public final class DistributedLockExecutor {
 
         RLock lock;
         long started = System.nanoTime();
+        // 仅获取阶段的运行时故障包装为 LockUnavailableException，竞争未获锁和线程中断另行报告。
         try {
             lock = client.getLock(lockName);
             // 明确使用两个参数的重载，不传入正数 leaseTime，以启用 watchdog。
@@ -90,6 +97,7 @@ public final class DistributedLockExecutor {
         ReleaseStatus release;
         long heldSince = System.nanoTime();
         String outcome = "error";
+        // 业务阶段与获锁异常处理分离，即使业务抛出锁异常类型也保持原样，不重试回调。
         try {
             value = work.execute();
             outcome = "success";
@@ -98,12 +106,14 @@ public final class DistributedLockExecutor {
             outcome = "interrupted";
             throw e;
         } finally {
+            // 成功、失败或中断都尝试释放；常规解锁失败转为状态，不覆盖业务结果或原始异常。
             release = release(lock);
             recordDuration("netagent.lock.hold.duration", outcome, heldSince);
         }
         return new Execution<>(true, value, release);
     }
 
+    // 释放状态仅反映本次解锁尝试，不能证明整个临界区期间始终拥有锁。
     private ReleaseStatus release(RLock lock) {
         ReleaseStatus status;
         // 临时清除中断，让解锁有机会执行，随后恢复中断状态。
@@ -133,6 +143,7 @@ public final class DistributedLockExecutor {
         return status;
     }
 
+    // 指标名和结果均来自固定调用点以保持低基数；观测失败不能改变获锁或业务结论。
     private void recordDuration(String name, String outcome, long started) {
         try {
             meters.timer(name, "outcome", outcome).record(System.nanoTime() - started, TimeUnit.NANOSECONDS);

@@ -130,6 +130,7 @@ public final class RedissonDistributedCache implements DistributedCache {
         return load(key, javaType(type), region, Objects.requireNonNull(loader, "回源加载器不能为空"));
     }
 
+    // failOpen 不吞回源异常；LOADED 仅代表回源成功，不承诺回填缓存或释放锁成功。
     private <T> CacheResult<T> load(CacheKey key, JavaType type, CacheProperties.Region region,
                                   Loader<T> loader) throws Exception {
         CacheResult<T> first = read(key, type, region);
@@ -179,6 +180,7 @@ public final class RedissonDistributedCache implements DistributedCache {
             return degradedLoad(key, loader);
         }
         if (execution.acquired()) {
+            // 业务回调已经完成；释放异常只按区域策略处理，不能为补救解锁而再次执行回源。
             if (execution.releaseStatus() != DistributedLockExecutor.ReleaseStatus.RELEASED) {
                 counter("netagent.cache.errors", key.region(), "lock_release");
                 if (!region.failOpen()) {
@@ -196,14 +198,17 @@ public final class RedissonDistributedCache implements DistributedCache {
         if (last.status() == CacheResult.Status.UNAVAILABLE) {
             return degradedLoad(key, loader);
         }
+        // 锁竞争后的重读仍未命中就报忙；即使 failOpen 也不能因普通竞争直接击穿数据源。
         counter("netagent.cache.requests", key.region(), "busy");
         throw new CacheBusyException();
     }
 
+    // 仅供已允许降级的基础设施故障路径调用；回源后不尝试回填不可用的缓存。
     private <T> CacheResult<T> degradedLoad(CacheKey key, Loader<T> loader) throws Exception {
         return CacheResult.loaded(invokeLoader(key.region(), "degraded", loader));
     }
 
+    // normal 与 degraded 共用单区域、单实例的 4 个并发许可，耗尽立即报忙而不排队。
     private <T> T invokeLoader(String region, String mode, Loader<T> loader) throws Exception {
         if (Thread.currentThread().isInterrupted()) {
             throw new InterruptedException("缓存回源前线程已被中断");
@@ -220,10 +225,12 @@ public final class RedissonDistributedCache implements DistributedCache {
             outcome = value == null ? "null" : "success";
             return value;
         } catch (InterruptedException e) {
+            // 保留调用方的取消信号并透传原异常，不把中断转成空结果或触发重试。
             Thread.currentThread().interrupt();
             outcome = "interrupted";
             throw e;
         } finally {
+            // 回源失败也归还许可；先释放预算，避免指标处理延长回源占用。
             budget.release();
             try {
                 meters.timer("netagent.cache.load.duration", "region", region, "mode", mode, "outcome", outcome)
@@ -234,11 +241,13 @@ public final class RedissonDistributedCache implements DistributedCache {
         }
     }
 
+    // 不存在与不可用分开报告；坏数据按未命中处理，不据此推断数据源为空。
     private <T> CacheResult<T> read(CacheKey key, JavaType type, CacheProperties.Region region) {
         String json;
         try {
             json = bucket(key).get();
         } catch (RuntimeException e) {
+            // failOpen 返回 UNAVAILABLE，failClosed 在此抛出；读故障不能伪装成 MISS。
             unavailable(key.region(), region, "read", e);
             return CacheResult.unavailable();
         }
@@ -253,6 +262,7 @@ public final class RedissonDistributedCache implements DistributedCache {
             if (envelope == null || !envelope.isObject()) {
                 return miss(key.region(), "invalid_payload");
             }
+            // 先检查 schemaVersion、typeDigest 和 nullValue 一致性，再按调用方类型解码，绝不按缓存类名加载。
             JsonNode version = envelope.path("schemaVersion");
             if (!version.isIntegralNumber() || !version.canConvertToInt() || version.intValue() != SCHEMA_VERSION) {
                 return miss(key.region(), "unknown_schema");
@@ -285,11 +295,13 @@ public final class RedissonDistributedCache implements DistributedCache {
         // 坏数据或未知版本可能来自较新的写入方，读取路径绝不自动删除。
     }
 
+    // 按声明类型编码并限制整个信封的 UTF-8 字节数；编码错误不受 failOpen 豁免。
     private <T> WriteResult write(CacheKey key, T value, JavaType type, CacheProperties.Region region,
                                   Duration overrideTtl) {
         if (value == null && !region.cacheNulls()) {
             return skipAndInvalidate(key, region, WriteResult.SKIPPED_NULL, "null_disabled");
         }
+        // 空值短 TTL 优先于显式 TTL；非空值才按显式、区域、默认顺序选择，随后统一抖动。
         Duration ttl = value == null ? properties.nullTtl()
                 : overrideTtl != null ? overrideTtl : region.ttl() != null ? region.ttl() : properties.defaultTtl();
         Duration actualTtl = jitteredTtl(ttl);
@@ -326,6 +338,7 @@ public final class RedissonDistributedCache implements DistributedCache {
         }
     }
 
+    // 跳过原因指标仅记录写入决策，是否已失效仍须以删除结果为准。
     private WriteResult skipAndInvalidate(CacheKey key, CacheProperties.Region region,
                                           WriteResult result, String outcome) {
         counter("netagent.cache.writes", key.region(), outcome);
@@ -334,6 +347,7 @@ public final class RedissonDistributedCache implements DistributedCache {
         return delete(key, region) == EvictionResult.UNAVAILABLE ? WriteResult.UNAVAILABLE : result;
     }
 
+    // ABSENT 同样满足本次失效要求；删除成功不保证之后没有并发写入。
     private EvictionResult delete(CacheKey key, CacheProperties.Region region) {
         try {
             return bucket(key).delete() ? EvictionResult.EVICTED : EvictionResult.ABSENT;
@@ -343,6 +357,7 @@ public final class RedissonDistributedCache implements DistributedCache {
         }
     }
 
+    // 缓存桶局部使用 StringCodec 传输 JSON 文本，不依赖客户端默认 Codec。
     private RBucket<String> bucket(CacheKey key) {
         // 禁止隐式重试，以免一次调用超出既定等待预算。
         return client.getBucket(PlainOptions.name(
@@ -350,6 +365,7 @@ public final class RedissonDistributedCache implements DistributedCache {
                 .codec(StringCodec.INSTANCE).retryAttempts(0));
     }
 
+    // 先校验区域再访问 Redis；failOpen 不豁免键为空或区域未配置等调用错误。
     private CacheProperties.Region region(CacheKey key) {
         Objects.requireNonNull(key, "缓存键不能为空");
         CacheProperties.Region region = properties.regions().get(key.region());
@@ -359,18 +375,22 @@ public final class RedissonDistributedCache implements DistributedCache {
         return region;
     }
 
+    // Class 来自调用方可信代码；容器的实际泛型参数不能仅靠 Class 表达。
     private JavaType javaType(Class<?> type) {
         return mapper.constructType(Objects.requireNonNull(type, "缓存值类型不能为空"));
     }
 
+    // 保留包括嵌套泛型在内的声明类型，不从待缓存值推断类型。
     private JavaType javaType(TypeReference<?> type) {
         return mapper.constructType(Objects.requireNonNull(type, "缓存值类型不能为空").getType());
     }
 
+    // 摘要基于含泛型参数的规范类型名，仅用于类型匹配，不是对缓存内容的签名认证。
     private String typeDigest(JavaType type) {
         return RedisKeyFactory.digest(type.toCanonical());
     }
 
+    // 正常缺失不计错误；协议或载荷不兼容则同时记录未命中及固定原因，返回值不携带坏数据。
     private <T> CacheResult<T> miss(String region, String reason) {
         counter("netagent.cache.requests", region, "miss");
         if (reason != null) {
@@ -379,6 +399,7 @@ public final class RedissonDistributedCache implements DistributedCache {
         return CacheResult.miss();
     }
 
+    // 仅处理 Redis 操作故障，不包装 Loader 异常；允许降级时由调用方返回对应的不可用状态。
     private void unavailable(String regionName, CacheProperties.Region region, String operation,
                              RuntimeException failure) {
         counter("netagent.cache.errors", regionName, operation);
@@ -389,6 +410,7 @@ public final class RedissonDistributedCache implements DistributedCache {
         }
     }
 
+    // 指标名和结果取自固定调用点，区域来自配置，保持低基数；采集失败不影响业务。
     private void counter(String name, String region, String outcome) {
         try {
             meters.counter(name, "region", region, "outcome", outcome).increment();
@@ -397,6 +419,7 @@ public final class RedissonDistributedCache implements DistributedCache {
         }
     }
 
+    // 抖动可缩短或延长选定 TTL，但结果至少为 1ms，避免退化为零有效期。
     Duration jitteredTtl(Duration ttl) {
         long millis = positiveMillis(ttl);
         double ratio = properties.ttlJitterRatio();
@@ -405,6 +428,7 @@ public final class RedissonDistributedCache implements DistributedCache {
         return Duration.ofMillis(Math.max(1, Math.round(millis * multiplier)));
     }
 
+    // 正的亚毫秒时长提升到 1ms；毫秒转换溢出按参数错误拒绝，不静默截断。
     private static long positiveMillis(Duration ttl) {
         Objects.requireNonNull(ttl, "缓存有效期不能为空");
         if (ttl.isNegative() || ttl.isZero()) {

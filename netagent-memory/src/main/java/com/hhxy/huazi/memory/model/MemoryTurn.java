@@ -5,12 +5,15 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+/** 从一个用户输入到最终助手回答的完整轮次，是原子保存和窗口裁剪的单位，不能拆开保留工具过程。 */
 public record MemoryTurn(String requestId, List<MemoryMessage> messages, Instant createdAt) {
+    // messageId 与 callId 各自在本轮次内唯一；中间助手消息必须带工具调用，只有末条助手消息可作为最终回答。
     public MemoryTurn {
         MemoryScope.requireId(requestId);
         if (createdAt == null || messages == null || messages.size() < 2 || messages.stream().anyMatch(java.util.Objects::isNull)) {
             throw new MemoryValidationException("完整轮次必须包含消息和时间戳");
         }
+        // 固化消息顺序，确保构造后仍满足首尾角色及工具调用闭合约束。
         messages = List.copyOf(messages);
         if (messages.get(0).role() != MemoryMessage.Role.USER
                 || messages.get(messages.size() - 1).role() != MemoryMessage.Role.ASSISTANT

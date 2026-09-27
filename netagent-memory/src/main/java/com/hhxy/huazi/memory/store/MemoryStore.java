@@ -6,18 +6,20 @@ import com.hhxy.huazi.memory.model.MemorySnapshot;
 
 import java.util.Optional;
 
+/** 以完整快照为并发写入单位；实现须区分会话不存在、格式损坏和基础设施不可用。 */
 public interface MemoryStore {
+    /** initialized 仅表示本次调用创建了会话，不表示已有会话的内容是否为空。 */
     record LoadResult(MemorySnapshot snapshot, boolean initialized) { }
 
-    /** 读取不续期；不存在时不创建会话，以免核验操作改变会话生命周期。 */
+    /** 不存在时返回空且不创建会话；读取不续期，格式异常或不可用不能伪装成空结果。 */
     Optional<MemorySnapshot> load(MemoryScope scope);
 
-    /** 初始化须与存在性检查原子执行，避免覆盖并发创建的会话。 */
+    /** 原子创建或返回已有快照；只有实际创建才设置保留期，不覆盖并发创建的会话。 */
     LoadResult loadOrCreate(MemoryScope scope);
 
-    /** 原子核验版本和提交身份，拒绝覆盖并发更新，也不复活已过期会话。 */
+    /** replacement 须含完整轮次和新版本；原子核验 expectedRevision 与提交身份，不复活已过期会话。 */
     CommitResult compareAndSet(MemoryScope scope, String expectedRevision, MemorySnapshot replacement);
 
-    /** 用新版本的空快照替代删除键，使持有旧版本的提交失效。 */
+    /** 以新版本空快照清空或创建会话；并发变化时不覆盖新内容，结果未知时不能声称清空成功。 */
     CommitResult clear(MemoryScope scope);
 }

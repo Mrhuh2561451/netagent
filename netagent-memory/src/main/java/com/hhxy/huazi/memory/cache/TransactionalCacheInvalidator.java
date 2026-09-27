@@ -5,6 +5,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 import java.util.Objects;
 
+/** 提交后失效不是数据库与 Redis 的原子事务；回滚不删缓存，afterCommit 失败不会回滚数据库，须由调用方处理失效失败。 */
 public final class TransactionalCacheInvalidator {
     private final DistributedCache cache;
 
@@ -28,6 +29,7 @@ public final class TransactionalCacheInvalidator {
                 } catch (RuntimeException e) {
                     throw new CacheUnavailableException("事务提交后缓存失效失败");
                 }
+                // failOpen 区域可能返回 UNAVAILABLE 而不抛异常，事务后失效仍须将其作为失败报告。
                 if (result != DistributedCache.EvictionResult.EVICTED
                         && result != DistributedCache.EvictionResult.ABSENT) {
                     throw new CacheUnavailableException("事务提交后缓存失效失败");

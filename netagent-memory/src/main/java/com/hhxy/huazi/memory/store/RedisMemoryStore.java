@@ -29,13 +29,16 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
+/** 同一会话保存在单个 Redis Hash 中，由 Lua 原子完成版本比较、去重、写入和过期设置。 */
 public final class RedisMemoryStore implements MemoryStore {
     private static final String SCRIPT = readScript();
+    // 保留轮次列表的泛型类型，避免反序列化为无约束的映射对象。
     private static final TypeReference<List<MemoryTurn>> TURNS = new TypeReference<>() { };
     private final RScript script;
     private final RedisKeyFactory keys;
     private final MemoryProperties properties;
     private final TurnWindowPolicy policy;
+    // 拒绝尾随内容与重复 JSON 字段，避免不同解析器对同一载荷产生不同解释。
     private final ObjectMapper json = MemoryJson.createMapper()
             .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
             .enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION);
@@ -53,6 +56,7 @@ public final class RedisMemoryStore implements MemoryStore {
         this.policy = new TurnWindowPolicy(properties);
     }
 
+    /** {@inheritDoc} */
     @Override
     public Optional<MemorySnapshot> load(MemoryScope scope) {
         List<Object> result = read("load", scope, null);
@@ -62,13 +66,16 @@ public final class RedisMemoryStore implements MemoryStore {
         return Optional.of(decode(result).snapshot());
     }
 
+    /** {@inheritDoc} */
     @Override
     public LoadResult loadOrCreate(MemoryScope scope) {
+        // 候选空快照只有在键不存在时才落库；并发创建的胜出者由脚本决定。
         MemorySnapshot empty = MemorySnapshot.empty(UUID.randomUUID().toString(), Instant.now());
         policy.validateSnapshot(empty);
         return decode(read("init", scope, empty));
     }
 
+    /** {@inheritDoc} */
     @Override
     public CommitResult compareAndSet(MemoryScope scope, String expectedRevision, MemorySnapshot replacement) {
         MemorySnapshot.requireRevision(expectedRevision);
@@ -79,14 +86,17 @@ public final class RedisMemoryStore implements MemoryStore {
         return write("cas", scope, expectedRevision, replacement);
     }
 
+    /** {@inheritDoc} */
     @Override
     public CommitResult clear(MemoryScope scope) {
+        // 空字符串表示预读时会话不存在；脚本仍须确认期间没有其他请求创建会话。
         String expected = load(scope).map(MemorySnapshot::revision).orElse("");
         MemorySnapshot empty = MemorySnapshot.empty(UUID.randomUUID().toString(), Instant.now());
         policy.validateSnapshot(empty);
         return write("clear", scope, expected, empty);
     }
 
+    /** load 与 init 都返回状态快照；通信失败无法返回可信快照，统一报告存储不可用。 */
     private List<Object> read(String operation, MemoryScope scope, MemorySnapshot replacement) {
         try {
             return execute(operation, scope, "", replacement);
@@ -95,6 +105,7 @@ public final class RedisMemoryStore implements MemoryStore {
         }
     }
 
+    /** 提交结果与通信结果分开表达；只有确认成功的状态才能携带可供下一次提交使用的版本。 */
     private CommitResult write(String operation, MemoryScope scope, String expected, MemorySnapshot replacement) {
         try {
             List<Object> result = execute(operation, scope, expected, replacement);
@@ -114,6 +125,7 @@ public final class RedisMemoryStore implements MemoryStore {
         }
     }
 
+    /** 只发送一个会话键；协议错误转成领域异常，正常状态码留给读写路径分别解释。 */
     private List<Object> execute(String operation, MemoryScope scope, String expected, MemorySnapshot replacement) {
         Objects.requireNonNull(scope, "记忆作用域不能为空");
         String key = keys.memoryKey(scope.tenantId(), scope.userId(), scope.agentId(), scope.conversationId());
@@ -139,6 +151,7 @@ public final class RedisMemoryStore implements MemoryStore {
         return result;
     }
 
+    /** STATE 响应固定为状态码、初始化标记及六个 Hash 字段；读取后仍须通过 Java 模型和策略校验。 */
     private LoadResult decode(List<Object> result) {
         try {
             if (result.size() != 8 || !"STATE".equals(result.get(0))) {
@@ -158,6 +171,7 @@ public final class RedisMemoryStore implements MemoryStore {
         }
     }
 
+    /** 从随应用打包的类路径资源加载脚本，不依赖运行机器上的外部脚本文件。 */
     private static String readScript() {
         try (var stream = RedisMemoryStore.class.getResourceAsStream("/com/hhxy/huazi/memory/memory.lua")) {
             if (stream == null) {
