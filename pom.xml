@@ -17,6 +17,7 @@
         <module>netagent-knowledge</module>
         <module>netagent-mcp</module>
         <module>netagent-memory</module>
+        <module>netagent-common</module>
     </modules>
 
     <properties>

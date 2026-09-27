@@ -1,6 +1,40 @@
+# 设置端口
 server:
   port: 8089
 
+# 设置应用名称
 spring:
   application:
     name: netagent
+
+#pasql配置
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    username: postgres
+    password: postgres
+    url: jdbc:postgresql://localhost:5432/netagent?client_encoding=UTF8
+    # 连接池配置
+    hikari:
+      connection-timeout: 5000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      maximum-pool-size: 10
+      minimum-idle: 5
+      pool-name: netAgentHikariPool
+# redis配置
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+      password: 123456
+
+mybatis-plus:
+  global-config:
+    db-config:
+      logic-delete-field: deleted
+      logic-delete-value: 1 # 删除值
+      logic-not-delete-value: 0 # 未删除值
+
+
+
+
