@@ -27,13 +27,37 @@ spring:
       host: 127.0.0.1
       port: 6379
       password: 123456
-
+# mybatis-plus配置
 mybatis-plus:
+  # 全局配置
   global-config:
+    # 数据库配置
     db-config:
+      # 逻辑删除字段
       logic-delete-field: deleted
       logic-delete-value: 1 # 删除值
       logic-not-delete-value: 0 # 未删除值
+# sa-Token配置
+sa-Token:
+  # token名称
+  token-name: NetAgent
+  # token有效期
+  timeout: 2592000
+  # 是否开启并发控制
+  is-concurrent: true
+  # 是否开启Token共享
+  is-share: true
+  # 是否开启Token日志
+  is-log: true
+  # token样式
+  token-style: simple-uuid
+  # 是否打印Token
+  is-print: false
+
+
+
+
+
 
 
 

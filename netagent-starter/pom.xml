@@ -21,17 +21,25 @@
             <groupId>com.hhxy.huazi</groupId>
             <artifactId>netagent-agent</artifactId>
         </dependency>
+
         <dependency>
             <groupId>com.hhxy.huazi</groupId>
             <artifactId>netagent-knowledge</artifactId>
         </dependency>
+
         <dependency>
             <groupId>com.hhxy.huazi</groupId>
             <artifactId>netagent-mcp</artifactId>
         </dependency>
+
         <dependency>
             <groupId>com.hhxy.huazi</groupId>
             <artifactId>netagent-memory</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.hhxy.huazi</groupId>
+            <artifactId>netagent-common</artifactId>
         </dependency>
 
 <!--        引入的外部配置-->
@@ -58,6 +66,14 @@
         <dependency>
             <groupId>cn.dev33</groupId>
             <artifactId>sa-token-spring-boot3-starter</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>cn.dev33</groupId>
+            <artifactId>sa-token-redis-template</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>cn.hutool</groupId>
+            <artifactId>hutool-all</artifactId>
         </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
