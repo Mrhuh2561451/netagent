@@ -9,15 +9,12 @@ import com.hhxy.huazi.user.controller.vo.LoginVO;
 import com.hhxy.huazi.user.entity.User;
 import com.hhxy.huazi.user.mapper.UserMapper;
 import com.hhxy.huazi.user.service.AuthService;
-import com.hhxy.huazi.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
-
-    private final UserService userService;
 
     private final UserMapper userMapper;
 

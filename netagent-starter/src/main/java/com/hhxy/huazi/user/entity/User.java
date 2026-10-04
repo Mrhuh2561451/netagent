@@ -41,6 +41,7 @@ public class User {
     /**
      * 用户头像
      */
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private String avatar;
 
     /**
@@ -58,5 +59,6 @@ public class User {
     /**
      * 是否删除 0：正常 1：删除
      */
+    @TableLogic
     private Integer deleted;
 }

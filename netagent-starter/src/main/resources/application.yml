@@ -6,8 +6,12 @@ server:
 spring:
   application:
     name: netagent
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
 
-#pasql配置
+  #pasql配置
   datasource:
     driver-class-name: org.postgresql.Driver
     username: postgres

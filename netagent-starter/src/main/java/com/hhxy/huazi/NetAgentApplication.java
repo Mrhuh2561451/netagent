@@ -8,6 +8,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 @MapperScan("com.hhxy.huazi.user.mapper")
 public class NetAgentApplication {
 
+
     public static void main(String[] args) {
         SpringApplication.run(NetAgentApplication.class, args);
     }
