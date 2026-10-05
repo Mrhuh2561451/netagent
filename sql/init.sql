@@ -21,3 +21,6 @@ COMMENT ON COLUMN t_user.create_time IS '创建时间';
 COMMENT ON COLUMN t_user.update_time IS '更新时间';
 COMMENT ON COLUMN t_user.deleted IS '是否删除 0：正常 1：删除';
 
+
+
+

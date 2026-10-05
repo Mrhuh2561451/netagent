@@ -1,0 +1,2 @@
+INSERT INTO t_user (id, username, password, role, avatar, create_time, update_time, deleted)
+VALUES (2001523723396308993, 'admin', 'admin', 'admin', 'https://ts1.tc.mm.bing.net/th/id/OIP-C.nKetvjjSggVKwC55M-AzUwAAAA?w=193&h=193&c=8&rs=1&qlt=90&o=6&dpr=2&pid=ImgAns&rm=2', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
