@@ -1,7 +1,6 @@
 # 设置端口
 server:
   port: 8089
-
 # 设置应用名称
 spring:
   application:
@@ -10,7 +9,6 @@ spring:
     multipart:
       max-file-size: 10MB
       max-request-size: 10MB
-
   #pasql配置
   datasource:
     driver-class-name: org.postgresql.Driver
@@ -57,6 +55,16 @@ sa-Token:
   token-style: simple-uuid
   # 是否打印Token
   is-print: false
+# Agent 模型配置；密钥通过运行环境传入，不写入仓库
+netAgent:
+  agent:
+    # 未配置密钥时可设为 false，仅启动已有业务模块
+    enabled: ${AGENT_ENABLED}
+    chat:
+      base-url: ${LLM_BASE_URL}
+      endpoint-path: ${LLM_ENDPOINT_PATH}
+      api-key: ${LLM_API_KEY}
+      model: ${LLM_MODEL}
 
 
 
