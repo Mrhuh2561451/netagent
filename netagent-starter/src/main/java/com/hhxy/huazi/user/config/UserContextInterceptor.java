@@ -13,6 +13,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import jakarta.servlet.DispatcherType;
 import org.springframework.stereotype.Component;
+import org.springframework.web.cors.CorsUtils;
 import org.springframework.web.servlet.AsyncHandlerInterceptor;
 @RequiredArgsConstructor
 @Component
@@ -22,12 +23,13 @@ public class UserContextInterceptor implements AsyncHandlerInterceptor{
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
-        // 异步调度请求跳过（SSE 完成回调会触发 asyncDispatch，此时 SaToken 上下文已丢失）
+        UserContext.clear();
+        // 异步调度请求跳过（SSE 完成回调会触发 asyncDispatch）
         if (request.getDispatcherType() == DispatcherType.ASYNC) {
             return true;
         }
         // 预检请求放行，避免 CORS 阻断
-        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+        if (CorsUtils.isPreFlightRequest(request)) {
             return true;
         }
 
@@ -47,6 +49,15 @@ public class UserContextInterceptor implements AsyncHandlerInterceptor{
 
         return true;
     }
+
+    @Override
+    public void afterConcurrentHandlingStarted(HttpServletRequest request,
+                                               HttpServletResponse response,
+                                               Object handler) {
+        // 转异步时原请求线程会先归还线程池，必须在这里清理。
+        UserContext.clear();
+    }
+
     @Override
     public void afterCompletion(HttpServletRequest request,
                                 HttpServletResponse response,

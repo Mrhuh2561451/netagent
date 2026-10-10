@@ -31,8 +31,7 @@ public class SaTokenConfig implements WebMvcConfigurer{
 
                     if (attributes != null) {
                         HttpServletRequest request = attributes.getRequest();
-                        if (request.getDispatcherType() == DispatcherType.ASYNC
-                                || CorsUtils.isPreFlightRequest(request)) {
+                        if (request.getDispatcherType() == DispatcherType.ASYNC || CorsUtils.isPreFlightRequest(request)) {
                             return;
                         }
                     }
