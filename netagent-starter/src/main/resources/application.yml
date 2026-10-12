@@ -60,6 +60,7 @@ netAgent:
   agent:
     # 未配置密钥时可设为 false，仅启动已有业务模块
     enabled: ${AGENT_ENABLED}
+    sse-timeout-ms: 900000
     chat:
       base-url: ${LLM_BASE_URL}
       endpoint-path: ${LLM_ENDPOINT_PATH}
