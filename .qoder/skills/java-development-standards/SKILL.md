@@ -94,3 +94,14 @@ resources/mapper/            Mapper XML：按需编写 SQL
 
 - `/java-development-standards 按 Controller / Service / Impl / Mapper 分层实现这个接口，编译通过即可`
 - `/java-development-standards 解释这个方法的命名和注释是否符合提供的规范`
+
+## 追加约定：日志级别与统计
+
+- 新增或修改业务日志时，只使用 ERROR 和 INFO 级别。
+- 异常、报错使用 log.error(...)；必要的正常业务信息使用 log.info(...)。
+- 不使用 WARN、DEBUG、TRACE 级别的业务日志。
+- 只保留必要日志输出，不新增日志统计功能。
+- 仅维护本规范时，不主动批量修改现有业务日志或第三方框架的日志配置。
+
+## 使用示例
+

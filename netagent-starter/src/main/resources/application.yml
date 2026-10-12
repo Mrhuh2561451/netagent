@@ -39,6 +39,11 @@ mybatis-plus:
       logic-delete-field: deleted
       logic-delete-value: 1 # 删除值
       logic-not-delete-value: 0 # 未删除值
+logging:
+  level:
+    root: INFO
+    com.hhxy.huazi: INFO
+    io.agentscope: INFO
 # sa-Token配置
 sa-Token:
   # token名称

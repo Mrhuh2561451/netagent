@@ -10,6 +10,7 @@ import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.event.AgentEvent;
 import io.agentscope.core.event.TextBlockDeltaEvent;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.publisher.Flux;
@@ -17,6 +18,7 @@ import reactor.core.publisher.Flux;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AgentChatServiceImpl implements AgentChatService {
@@ -41,8 +43,11 @@ public class AgentChatServiceImpl implements AgentChatService {
     public  void startRun(String question, String userId, String actualConversationId, String taskId, SseEmitter sseEmitter){
 
         ReActAgent reActAgent = reActAgentProvider.getReActAgent();
-
-        Flux<AgentEvent> events = reActAgent.streamEvents(question);
+        RuntimeContext runtimeContext = RuntimeContext.builder()
+                .userId(userId)
+                .sessionId(actualConversationId)
+                .build();
+        Flux<AgentEvent> events = reActAgent.streamEvents(question,runtimeContext);
         events.subscribe(
                 event -> {
                     if (event instanceof TextBlockDeltaEvent textEvent) {
@@ -53,11 +58,12 @@ public class AgentChatServiceImpl implements AgentChatService {
                                         SseEmitter.event()
                                                 .name("message")
                                                 .data(delta)
-                                                .id(taskId)
+                                                .id(actualConversationId)
                                                 .comment("delta")
 
                                 );
                             } catch (IOException e) {
+                                log.error("sseEmitter 发送出错", e);
                                 throw new UncheckedIOException(e);
                             }
                         }
@@ -69,3 +75,4 @@ public class AgentChatServiceImpl implements AgentChatService {
 
     }
 }
+

@@ -71,11 +71,6 @@ public class PgAgentStateStore implements AgentStateStore {
     public Set<String> listSessionIds(String userId) {
         return new LinkedHashSet<>(agentStateMapper.selectSessionIds(userId));
     }
-
-    @Override
-    public void close() {
-        AgentStateStore.super.close();
-    }
     private String queryPayload(String userId, String sessionId, String key) {
         return agentStateMapper.selectPayload(userId, sessionId, key);
     }
