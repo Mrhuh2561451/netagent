@@ -15,7 +15,7 @@
 2. 运行 `mvn spring-boot:run`
 
 ## 项目结构
-neagent
+netagent
 
 
 
